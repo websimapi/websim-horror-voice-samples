@@ -22,12 +22,29 @@
             color: #ff4d4d;
             margin-bottom: 40px;
             text-shadow: 0 0 10px rgba(255, 77, 77, 0.5);
+            text-align: center;
         }
-        .controls {
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px; /* Space between sections */
+            max-width: 800px;
+            width: 100%;
+            padding: 20px;
+            background-color: #222;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        h2 {
+            color: #ff8c8c;
+            margin-top: 0;
+            border-bottom: 1px solid #440000;
+            padding-bottom: 10px;
+        }
+        .controls, .voice-selection-buttons {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
-            max-width: 800px;
             width: 100%;
         }
         button {
@@ -38,32 +55,124 @@
             font-size: 1.1em;
             cursor: pointer;
             border-radius: 8px;
-            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.1s ease;
+            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
         button:hover {
             background-color: #440000;
             border-color: #880000;
             transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
         }
         button:active {
             background-color: #220000;
             border-color: #440000;
             transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        button.active {
+            background-color: #660000;
+            border-color: #ff4d4d;
+            box-shadow: 0 0 15px rgba(255, 77, 77, 0.7);
+            transform: translateY(-1px);
+        }
+
+        #selectedVoiceInfo {
+            text-align: center;
+            margin-top: 15px;
+            font-style: italic;
+            color: #bbb;
+        }
+
+        textarea {
+            width: calc(100% - 20px); /* Adjust for padding */
+            padding: 10px;
+            margin-bottom: 20px;
+            background-color: #333;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            font-size: 1em;
+            border-radius: 5px;
+            resize: vertical;
+            min-height: 80px;
+            box-sizing: border-box; /* Include padding in width */
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #ff4d4d;
+            box-shadow: 0 0 5px rgba(255, 77, 77, 0.5);
+        }
+
+        #generationStatus {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+        #generatedAudioPlayer {
+            width: 100%;
+            margin-top: 20px;
+            display: block;
+        }
+
+        .generated-voices-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .voice-item {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .voice-item p {
+            margin: 0 0 8px 0;
+            line-height: 1.4;
+        }
+        .voice-item audio {
+            width: 100%;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>Scary Voice Samples</h1>
-    <div class="controls">
-        <button id="playVoice1">Play Scary Voice 1</button>
-        <button id="playVoice2">Play Scary Voice 2</button>
-        <button id="playVoice3">Play Scary Voice 3</button>
-        <button id="playVoice4">Play Scary Voice 4</button>
+    <h1>Scary Voice Samples & Generator</h1>
+    <div class="container">
+        <div class="voice-selection">
+            <h2>1. Select a Base Voice Sample</h2>
+            <div class="voice-selection-buttons">
+                <button class="voice-select-button" data-voice-id="1" data-voice-path="/scary_voice_1.mp3">Play & Select Voice 1</button>
+                <button class="voice-select-button" data-voice-id="2" data-voice-path="/scary_voice_2.mp3">Play & Select Voice 2</button>
+                <button class="voice-select-button" data-voice-id="3" data-voice-path="/scary_voice_3.mp3">Play & Select Voice 3</button>
+                <button class="voice-select-button" data-voice-id="4" data-voice-path="/scary_voice_4.mp3">Play & Select Voice 4</button>
+            </div>
+            <p id="selectedVoiceInfo">No voice selected.</p>
+        </div>
+
+        <div class="voice-generation">
+            <h2>2. Type Text & Generate</h2>
+            <textarea id="inputText" placeholder="Enter text to generate (e.g., 'Beware the shadows!'). Max 200 characters." rows="4" maxlength="200"></textarea>
+            <button id="generateVoice">Generate Cloned Voice</button>
+            <p id="generationStatus"></p>
+            <audio id="generatedAudioPlayer" controls style="display: none;"></audio>
+        </div>
+
+        <div class="generated-voices">
+            <h2>3. Previously Generated Voices</h2>
+            <div id="generatedVoicesList" class="generated-voices-list">
+                <!-- Generated voices will be loaded here -->
+                Loading...
+            </div>
+        </div>
     </div>
 
     <script type="module">
+        import { WebsimSocket } from 'https://cdn.jsdelivr.net/npm/websim@0.0.10/dist/websim.js';
+
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const room = new WebsimSocket(); // Initialize WebsimSocket once globally
 
         async function loadAudio(url) {
             try {
@@ -82,23 +191,158 @@
                 console.warn("Attempted to play null audio buffer.");
                 return;
             }
+            // Ensure audio context is resumed for playback (needed for some browsers)
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
             const source = audioContext.createBufferSource();
             source.buffer = buffer;
             source.connect(audioContext.destination);
             source.start(0);
         }
 
-        const voice1Buffer = await loadAudio('scary_voice_1.mp3');
-        const voice2Buffer = await loadAudio('scary_voice_2.mp3');
-        const voice3Buffer = await loadAudio('scary_voice_3.mp3');
-        const voice4Buffer = await loadAudio('scary_voice_4.mp3');
+        // Pre-load all voice samples for quick playback
+        const voiceBuffers = {};
+        const voicePaths = {
+            '/scary_voice_1.mp3': null,
+            '/scary_voice_2.mp3': null,
+            '/scary_voice_3.mp3': null,
+            '/scary_voice_4.mp3': null,
+        };
 
-        document.getElementById('playVoice1').addEventListener('click', () => playAudio(voice1Buffer));
-        document.getElementById('playVoice2').addEventListener('click', () => playAudio(voice2Buffer));
-        document.getElementById('playVoice3').addEventListener('click', () => playAudio(voice3Buffer));
-        document.getElementById('playVoice4').addEventListener('click', () => playAudio(voice4Buffer));
+        async function preloadVoices() {
+            const loadPromises = Object.keys(voicePaths).map(async (path) => {
+                const buffer = await loadAudio(path);
+                voiceBuffers[path] = buffer;
+            });
+            await Promise.all(loadPromises);
+        }
+
+        // Call preload
+        preloadVoices();
+
+        let selectedVoicePath = null;
+        let selectedVoiceId = null; 
+
+        document.querySelectorAll('.voice-select-button').forEach(button => {
+            button.addEventListener('click', async () => {
+                const voicePath = button.dataset.voicePath;
+                const voiceId = button.dataset.voiceId;
+                
+                // Play the selected voice
+                const buffer = voiceBuffers[voicePath];
+                if (buffer) {
+                    await playAudio(buffer);
+                } else {
+                    console.warn(`Voice buffer for ${voicePath} not loaded yet. Attempting to load now.`);
+                    // Fallback to loading on click if not preloaded (shouldn't happen, but good for robustness)
+                    const loadedBuffer = await loadAudio(voicePath);
+                    if (loadedBuffer) {
+                        voiceBuffers[voicePath] = loadedBuffer;
+                        await playAudio(loadedBuffer);
+                    }
+                }
+
+                // Update selected voice state
+                selectedVoicePath = voicePath;
+                selectedVoiceId = voiceId;
+                document.getElementById('selectedVoiceInfo').textContent = `Selected voice: Scary Voice ${voiceId} (${voicePath.replace('/', '')})`;
+
+                // Add active class to selected button and remove from others
+                document.querySelectorAll('.voice-select-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            });
+        });
+
+        document.getElementById('generateVoice').addEventListener('click', async () => {
+            if (!selectedVoicePath) {
+                alert('Please select a base voice sample first!');
+                return;
+            }
+
+            const inputText = document.getElementById('inputText').value.trim();
+            if (!inputText) {
+                alert('Please enter some text to generate!');
+                return;
+            }
+            if (inputText.length > 200) {
+                alert('Text is too long. Please keep it under 200 characters.');
+                return;
+            }
+
+            const statusElement = document.getElementById('generationStatus');
+            const audioPlayer = document.getElementById('generatedAudioPlayer');
+            
+            statusElement.textContent = 'Generating voice... This may take a moment.';
+            audioPlayer.style.display = 'none';
+            audioPlayer.src = ''; 
+            audioPlayer.load(); // Ensure player resets
+
+            try {
+                // Call websim.textToSpeech to clone the voice
+                const result = await websim.textToSpeech({
+                    text: inputText,
+                    voice_sample: selectedVoicePath,
+                });
+
+                const generatedAudioUrl = result.url;
+                audioPlayer.src = generatedAudioUrl;
+                audioPlayer.style.display = 'block';
+                statusElement.textContent = 'Voice generated successfully! Play it above.';
+                audioPlayer.play(); // Auto-play the generated audio for immediate feedback
+
+                // Save the generated voice to the database
+                await room.collection('generated_voice_v1').create({ // Using _v1 for schema versioning
+                    text: inputText,
+                    audioUrl: generatedAudioUrl,
+                    sampleUsed: selectedVoicePath,
+                });
+
+            } catch (error) {
+                console.error('Error generating voice:', error);
+                statusElement.textContent = `Error generating voice: ${error.message}. Please try again.`;
+                alert('Failed to generate voice. Please check console for more details.');
+            }
+        });
+
+        const generatedVoicesListDiv = document.getElementById('generatedVoicesList');
+
+        function renderGeneratedVoices(voices) {
+            if (!generatedVoicesListDiv) return; // Defensive check
+
+            if (voices.length === 0) {
+                generatedVoicesListDiv.innerHTML = '<p>No voices generated yet. Be the first!</p>';
+                return;
+            }
+            
+            // Filter out any incomplete entries (e.g., if audioUrl is missing)
+            const validVoices = voices.filter(voice => voice.audioUrl && voice.text && voice.username && voice.sampleUsed);
+
+            // Sort from newest to oldest for display
+            validVoices.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            generatedVoicesListDiv.innerHTML = ''; // Clear existing content
+            validVoices.forEach(voice => {
+                const voiceItem = document.createElement('div');
+                voiceItem.className = 'voice-item';
+                // Clean up the sampleUsed display for readability
+                const sampleName = voice.sampleUsed.replace('/scary_voice_', 'Voice ').replace('.mp3', '');
+                voiceItem.innerHTML = `
+                    <p><strong>"${voice.text}"</strong></p>
+                    <p>Generated by: ${voice.username} (using ${sampleName})</p>
+                    <audio controls src="${voice.audioUrl}"></audio>
+                `;
+                generatedVoicesListDiv.appendChild(voiceItem);
+            });
+        }
+
+        // Subscribe to changes in the 'generated_voice_v1' collection
+        room.collection('generated_voice_v1').subscribe(renderGeneratedVoices);
+
+        // Initial load of generated voices
+        renderGeneratedVoices(room.collection('generated_voice_v1').getList());
+
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
