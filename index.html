@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horror Voice Samples</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #ff4d4d;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px rgba(255, 77, 77, 0.5);
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            max-width: 800px;
+            width: 100%;
+        }
+        button {
+            background-color: #330000;
+            color: #ffcccc;
+            border: 2px solid #660000;
+            padding: 15px 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        button:hover {
+            background-color: #440000;
+            border-color: #880000;
+            transform: translateY(-2px);
+        }
+        button:active {
+            background-color: #220000;
+            border-color: #440000;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <h1>Scary Voice Samples</h1>
+    <div class="controls">
+        <button id="playVoice1">Play Scary Voice 1</button>
+        <button id="playVoice2">Play Scary Voice 2</button>
+        <button id="playVoice3">Play Scary Voice 3</button>
+        <button id="playVoice4">Play Scary Voice 4</button>
+    </div>
+
+    <script type="module">
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        async function loadAudio(url) {
+            try {
+                const response = await fetch(url);
+                const arrayBuffer = await response.arrayBuffer();
+                return await audioContext.decodeAudioData(arrayBuffer);
+            } catch (error) {
+                console.error(`Error loading audio from ${url}:`, error);
+                alert(`Failed to load audio: ${url}`);
+                return null;
+            }
+        }
+
+        async function playAudio(buffer) {
+            if (!buffer) {
+                console.warn("Attempted to play null audio buffer.");
+                return;
+            }
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+        }
+
+        const voice1Buffer = await loadAudio('scary_voice_1.mp3');
+        const voice2Buffer = await loadAudio('scary_voice_2.mp3');
+        const voice3Buffer = await loadAudio('scary_voice_3.mp3');
+        const voice4Buffer = await loadAudio('scary_voice_4.mp3');
+
+        document.getElementById('playVoice1').addEventListener('click', () => playAudio(voice1Buffer));
+        document.getElementById('playVoice2').addEventListener('click', () => playAudio(voice2Buffer));
+        document.getElementById('playVoice3').addEventListener('click', () => playAudio(voice3Buffer));
+        document.getElementById('playVoice4').addEventListener('click', () => playAudio(voice4Buffer));
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
